@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import pygame
 import sys
 import os
@@ -28,7 +29,7 @@ CINZA_ESCURO = (150, 150, 150)
 estado = "menu"
 estado_anterior = "menu"
 rodadas = 5
-chave_openai = "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"
+chave_openai = os.getenv("OPENAI_API_KEY", "")
 volume = 0.5
 mostrar_combo = False
 opcoes_combo = [
@@ -176,7 +177,7 @@ def desenhar_config():
     tela.blit(moldura, (campo_chave.x, campo_chave.y))
     tela.blit(fonte_media.render("Chave OpenAI:", True, PRETO), (campo_chave.x - 230, campo_chave.y + 12))
 
-    texto_visivel = chave_openai
+    texto_visivel = ("*" * max(len(chave_openai) - 4, 0) + chave_openai[-4:]) if chave_openai else ""
     padding = 20
     max_width = campo_chave.width - padding
 

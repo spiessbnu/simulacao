@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import pygame
 import os
 import sys
@@ -211,14 +212,18 @@ class DialogueSystem:
 
 class DebateSimulator:
     def __init__(self, chave_api, nomes_personagens, ordem_falantes, pauta_texto):
-        if not chave_api: raise ValueError("A chave da API da OpenAI não foi fornecida.")
-        self.client = OpenAI(api_key="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")
+        chave_api = (chave_api or "").strip()
+        if not chave_api:
+            raise ValueError("A chave da API da OpenAI não foi fornecida.")
+        self.client = OpenAI(api_key=chave_api)
         self.MODEL_NAME = "gpt-4o-mini"
         self.ORDEM_FALANTES = ordem_falantes
         self.MAX_HISTORICO = 6
         self.personas = {nome: PROMPTS_COMPLETOS.get(nome) for nome in nomes_personagens}
         self.historico = [{"falante": self.ORDEM_FALANTES[0], "texto": pauta_texto}]
         self.ultimo_falante = self.ORDEM_FALANTES[0]
+        self.turnos_por_falante = {nome: 0 for nome in self.ORDEM_FALANTES}
+        self.turnos_por_falante[self.ultimo_falante] = 1
         self.next_turn = None
 
     def gerar_resposta(self, mensagens):
@@ -230,8 +235,18 @@ class DebateSimulator:
             return "Ocorreu um erro ao conectar com a IA. Verifique sua chave e conexão."
 
     def escolher_proximo_falante(self):
-        index = self.ORDEM_FALANTES.index(self.ultimo_falante)
-        return self.ORDEM_FALANTES[(index + 1) % len(self.ORDEM_FALANTES)]
+        candidatos = [nome for nome in self.ORDEM_FALANTES if nome != self.ultimo_falante]
+        if not candidatos:
+            return self.ultimo_falante
+
+        maior_numero_de_turnos = max(self.turnos_por_falante.values())
+        pesos = []
+        for nome in candidatos:
+            iniciativa = self.personas.get(nome, {}).get("iniciativa", 1)
+            bonus_participacao = maior_numero_de_turnos - self.turnos_por_falante.get(nome, 0) + 1
+            pesos.append(max(1, iniciativa) * bonus_participacao)
+
+        return random.choices(candidatos, weights=pesos, k=1)[0]
 
     def get_proximo_falante(self):
         return self.escolher_proximo_falante()
@@ -256,6 +271,7 @@ class DebateSimulator:
         if not pregenerate_next:
             self.historico.append({"falante": proximo, "texto": resposta})
             self.ultimo_falante = proximo
+            self.turnos_por_falante[proximo] = self.turnos_por_falante.get(proximo, 0) + 1
 
         return turno_data
 
@@ -331,6 +347,9 @@ def executar_debate(tela, fontes, config_debate):
                             debate_simulator.historico.append(
                                 {"falante": current_turn["speaker"], "texto": current_turn["text"]})
                             debate_simulator.ultimo_falante = current_turn["speaker"]
+                            debate_simulator.turnos_por_falante[current_turn["speaker"]] = (
+                                debate_simulator.turnos_por_falante.get(current_turn["speaker"], 0) + 1
+                            )
                             dialogue_system.smart_wrap(current_turn["text"])
 
                             if turnos_atuais < turnos_totais:
